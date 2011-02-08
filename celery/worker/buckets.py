@@ -63,27 +63,35 @@ class TaskBucket(object):
 
     def _get_immediate(self):
         try:
-            return self.immediate.popleft()
+            return self.immediate.popleft()[1]
         except IndexError:
             raise Empty()
 
     def _get(self):
-        # If the first bucket is always returning items, we would never
-        # get to fetch items from the other buckets. So we always iterate over
-        # all the buckets and put any ready items into a queue called
-        # "immediate". This queue is always checked for cached items first.
-        try:
-            return 0, self._get_immediate()
-        except Empty:
-            pass
-
+        if len(self.immediate):
+            immediate_priority = self.immediate[0][0]
+        else:
+            immediate_priority = None
+        
         remaining_times = []
-        for bucket in self.buckets.values():
+        buckets = sorted(self.buckets.values(),
+                         key=lambda bucket: bucket.priority)
+        for bucket in buckets:
+            # The immediate queue should be exhausted before adding any
+            # tasks of the same or lower priority. This ensures that a 
+            # single bucket cannot hog the queue at the expense of buckets
+            # with the same priority. It can hog the queue at the expense
+            # of lower priority buckets.
+            if (immediate_priority is not None and
+                bucket.priority >= immediate_priority):
+                break
+
             remaining = bucket.expected_time()
             if not remaining:
                 try:
-                    # Just put any ready items into the immediate queue.
-                    self.immediate.append(bucket.get_nowait())
+                    # Put ready items at the front of the immediate queue.
+                    self.immediate.appendleft((bucket.priority, 
+                                               bucket.get_nowait()))
                 except Empty:
                     pass
                 except RateLimitExceeded:
@@ -91,7 +99,7 @@ class TaskBucket(object):
             else:
                 remaining_times.append(remaining)
 
-        # Try the immediate queue again.
+        # The immediate queue will now be ordered in decreasing priority.
         try:
             return 0, self._get_immediate()
         except Empty:
@@ -164,11 +172,15 @@ class TaskBucket(object):
         task_queue = FastQueue()
         if task_name in self.buckets:
             task_queue = self._get_queue_for_type(task_name)
-        else:
-            task_queue = FastQueue()
 
         if rate_limit:
             task_queue = TokenBucketQueue(rate_limit, queue=task_queue)
+
+        task = self.task_registry[task_name]
+        if hasattr(task, 'priority'):
+            task_queue.priority = task.priority
+        else:
+            task_queue.priority = 0
 
         self.buckets[task_name] = task_queue
         return task_queue

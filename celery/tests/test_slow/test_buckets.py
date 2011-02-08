@@ -110,10 +110,12 @@ class test_rate_limit_string(unittest.TestCase):
 
 class TaskA(Task):
     rate_limit = 10
+    priority = 1
 
 
 class TaskB(Task):
     rate_limit = None
+    priority = 2
 
 
 class TaskC(Task):
@@ -282,6 +284,18 @@ class test_TaskBucket(unittest.TestCase):
         x.buckets[TaskB.name].put(2)
         x.buckets[TaskC.name].put(3)
         self.assertItemsEqual(x.items, [1, 2, 3])
+
+    @skip_if_disabled
+    def test_priority_get(self):
+        b = buckets.TaskBucket(task_registry=self.registry)
+        ajob = MockJob(gen_unique_id(), TaskA.name, ["theqbf"], {"foo": "bar"})
+        b.put(ajob)
+        bjob = MockJob(gen_unique_id(), TaskB.name, ["theqbf"], {"foo": "bar"})
+        b.put(bjob)
+
+        # TaskB is higher priority than TaskA so must be returned first
+        self.assertEqual(b.get(), bjob)
+        self.assertEqual(b.get(), ajob)
 
 
 class test_FastQueue(unittest.TestCase):
