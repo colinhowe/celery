@@ -89,9 +89,9 @@ class TaskBucket(object):
             remaining = bucket.expected_time()
             if not remaining:
                 try:
-                    # Put ready items at the front of the immediate queue.
-                    self.immediate.appendleft((bucket.priority, 
-                                               bucket.get_nowait()))
+                    # Put ready items at the end of the immediate queue.
+                    self.immediate.append((bucket.priority, 
+                                           bucket.get_nowait()))
                 except Empty:
                     pass
                 except RateLimitExceeded:

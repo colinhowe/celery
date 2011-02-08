@@ -288,14 +288,14 @@ class test_TaskBucket(unittest.TestCase):
     @skip_if_disabled
     def test_priority_get(self):
         b = buckets.TaskBucket(task_registry=self.registry)
-        ajob = MockJob(gen_unique_id(), TaskA.name, ["theqbf"], {"foo": "bar"})
-        b.put(ajob)
         bjob = MockJob(gen_unique_id(), TaskB.name, ["theqbf"], {"foo": "bar"})
         b.put(bjob)
+        ajob = MockJob(gen_unique_id(), TaskA.name, ["theqbf"], {"foo": "bar"})
+        b.put(ajob)
 
-        # TaskB is higher priority than TaskA so must be returned first
-        self.assertEqual(b.get(), bjob)
+        # TaskA is higher priority than TaskB so must be returned first
         self.assertEqual(b.get(), ajob)
+        self.assertEqual(b.get(), bjob)
 
 
 class test_FastQueue(unittest.TestCase):
