@@ -75,7 +75,7 @@ class TaskBucket(object):
         
         remaining_times = []
         buckets = sorted(self.buckets.values(),
-                         key=lambda bucket: bucket.priority)
+                         key=lambda bucket: bucket.priority and -1 * bucket.priority)
         for bucket in buckets:
             # The immediate queue should be exhausted before adding any
             # tasks of the same or lower priority. This ensures that a 
@@ -84,14 +84,14 @@ class TaskBucket(object):
             # of lower priority buckets.
             if (immediate_priority is not None and
                 bucket.priority >= immediate_priority):
-                break
+                continue
 
             remaining = bucket.expected_time()
             if not remaining:
                 try:
-                    # Put ready items at the end of the immediate queue.
-                    self.immediate.append((bucket.priority, 
-                                           bucket.get_nowait()))
+                    # Put ready items at the front of the immediate queue.
+                    self.immediate.appendleft((bucket.priority, 
+                                               bucket.get_nowait()))
                 except Empty:
                     pass
                 except RateLimitExceeded:
