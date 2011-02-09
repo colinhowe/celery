@@ -70,6 +70,7 @@ class TaskTrace(object):
     def execute(self):
         self.task.request.update(self.request, args=self.args,
                                                kwargs=self.kwargs)
+        self.task.request.priority = self.task.request.delivery_info['priority']
         signals.task_prerun.send(sender=self.task, task_id=self.task_id,
                                  task=self.task, args=self.args,
                                  kwargs=self.kwargs)

@@ -299,6 +299,7 @@ class TaskRequest(object):
         priority = None
         if '__priority' in kwargs:
             priority = kwargs['__priority']
+            delivery_info['priority'] = priority
             del(kwargs['__priority'])
 
         return cls(task_name=body["task"],
