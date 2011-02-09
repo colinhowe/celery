@@ -31,6 +31,8 @@ class Router(object):
         self.create_missing = create_missing
 
     def route(self, options, task, args=(), kwargs={}):
+        if "queue" in options and options['queue'] is None:
+            del(options['queue'])
         if "queue" in options:
             options['queue'] += '__%d'%options['priority']
 

@@ -306,7 +306,7 @@ class BaseTask(object):
                                           routing_key=self.routing_key)
 
     @classmethod
-    def delay(self, *args, **kwargs):
+    def delay(self, priority=None, *args, **kwargs):
         """Star argument version of :meth:`apply_async`.
 
         Does not support the extra options enabled by :meth:`apply_async`.
@@ -317,7 +317,10 @@ class BaseTask(object):
         :returns :class:`celery.result.AsyncResult`:
 
         """
-        return self.apply_async(args, kwargs)
+        if priority is None:
+            return self.apply_async(args, kwargs)
+        else:
+            return self.apply_async(args, kwargs, priority=priority)
 
     @classmethod
     def apply_async(self, args=None, kwargs=None, countdown=None,
@@ -416,6 +419,10 @@ class BaseTask(object):
 
         if conf.CELERY_ALWAYS_EAGER:
             return self.apply(args, kwargs, task_id=task_id)
+
+        if 'priority' not in options:
+            options['priority'] = self.priority or 0
+        options['priority'] = options['priority'] or 0
 
         options.setdefault("compression",
                            conf.CELERY_MESSAGE_COMPRESSION)
