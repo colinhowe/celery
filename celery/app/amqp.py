@@ -342,7 +342,6 @@ class AMQP(object):
                     new_options['binding_key'] += '__%d'%p
                     new_options['exchange'] += '__%d'%p
                     queues["%s__%d"%(name, p)] = new_options
-            print queues
             queues = Queues(queues)
         else:
             queues = defined_queues
