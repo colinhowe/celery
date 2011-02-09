@@ -150,6 +150,13 @@ class Worker(object):
                         self.use_queues, exc))
         self.queues = self.app.amqp.queues
 
+        if self.app.conf.CELERY_EMULATE_PRIORITY:
+            new_queues = {}
+            for name, options in self.queues.items():
+                for p in range(10):
+                    new_queues['%s__%d'%(name, p)] = options
+            self.queues = self.app.amqp.Queues(new_queues)
+
     def init_loader(self):
         self.loader = self.app.loader
         self.settings = self.app.conf

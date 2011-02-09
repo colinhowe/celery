@@ -31,6 +31,9 @@ class Router(object):
         self.create_missing = create_missing
 
     def route(self, options, task, args=(), kwargs={}):
+        if "queue" in options:
+            options['queue'] += '__%d'%options['priority']
+
         options = self.expand_destination(options)  # expands 'queue'
         if self.routes:
             route = self.lookup_route(task, args, kwargs)

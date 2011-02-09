@@ -63,9 +63,7 @@ class TaskBucket(object):
 
     def _get_immediate(self):
         try:
-            x = self.immediate.get_nowait()[1]
-            print 'Got %s'%str(x)
-            return x
+            return self.immediate.get_nowait()[1]
         except IndexError:
             raise Empty()
 
@@ -77,7 +75,6 @@ class TaskBucket(object):
                 try:
                     # Put ready items at the front of the immediate queue.
                     task = bucket.get_nowait()
-                    print 'Putting (%d, %s)'%(task.priority, task)
                     self.immediate.put_nowait((task.priority, task))
                 except Empty:
                     pass
