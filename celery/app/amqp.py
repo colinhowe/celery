@@ -326,13 +326,27 @@ class AMQP(object):
     def get_default_queue(self):
         """Returns `(queue_name, queue_options)` tuple for the queue
         configured to be default (:setting:`CELERY_DEFAULT_QUEUE`)."""
-        q = self.app.conf.CELERY_DEFAULT_QUEUE
+        q = "%s__%d"%(self.app.conf.CELERY_DEFAULT_QUEUE, 0)
         return q, self.queues[q]
 
     @cached_property
     def queues(self):
         """Queue name⇒ declaration mapping."""
-        return self.Queues(self.app.conf.CELERY_QUEUES)
+        defined_queues = self.Queues(self.app.conf.CELERY_QUEUES)
+        if self.app.conf.CELERY_EMULATE_PRIORITY:
+            queues = {}
+            for name, options in defined_queues.items(): 
+                for p in range(10):
+                    new_options = dict(options)
+                    new_options['routing_key'] += '__%d'%p
+                    new_options['binding_key'] += '__%d'%p
+                    new_options['exchange'] += '__%d'%p
+                    queues["%s__%d"%(name, p)] = new_options
+            print queues
+            queues = Queues(queues)
+        else:
+            queues = defined_queues
+        return queues
 
     @queues.setter
     def queues(self, value):

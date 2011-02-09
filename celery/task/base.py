@@ -421,6 +421,15 @@ class BaseTask(object):
                            conf.CELERY_MESSAGE_COMPRESSION)
         options = dict(extract_exec_options(self), **options)
         options = router.route(options, self.name, args, kwargs)
+
+#        print options
+#        if conf.CELERY_EMULATE_PRIORITY:
+#            options['queue'] += '__%d'%options['priority']
+#            options['binding_key'] += '__%d'%options['priority']
+#            options['exchange'] += '__%d'%options['priority']
+#            options['routing_key'] += '__%d'%options['priority']
+#        print options
+        
         exchange = options.get("exchange")
         exchange_type = options.get("exchange_type")
         expires = expires or self.expires
@@ -432,6 +441,10 @@ class BaseTask(object):
         if conf.CELERY_SEND_TASK_SENT_EVENT:
             evd = self.app.events.Dispatcher(channel=publish.channel,
                                              buffer_while_offline=False)
+
+        if conf.CELERY_EMULATE_PRIORITY:
+            kwargs = kwargs or {}
+            kwargs['__priority'] = options['priority']
 
         try:
             task_id = publish.delay_task(self.name, args, kwargs,

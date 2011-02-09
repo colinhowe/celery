@@ -2,7 +2,7 @@ import threading
 
 from collections import deque
 from time import time, sleep
-from Queue import Queue, Empty
+from Queue import Queue, Empty, PriorityQueue
 
 from celery.datastructures import TokenBucket
 from celery.utils import timeutils
@@ -44,7 +44,7 @@ class TaskBucket(object):
         self.task_registry = task_registry
         self.buckets = {}
         self.init_with_registry()
-        self.immediate = deque()
+        self.immediate = PriorityQueue()
         self.mutex = threading.Lock()
         self.not_empty = threading.Condition(self.mutex)
 
@@ -53,9 +53,9 @@ class TaskBucket(object):
         the appropiate bucket."""
         self.mutex.acquire()
         try:
-            if request.task_name not in self.buckets:
-                self.add_bucket_for_type(request.task_name)
-            self.buckets[request.task_name].put_nowait(request)
+            self.add_bucket_for_type(request.task_name)
+            name = "%s_%d"%(request.task_name, request.priority)
+            self.buckets[name].put_nowait(request)
             self.not_empty.notify()
         finally:
             self.mutex.release()
@@ -63,35 +63,22 @@ class TaskBucket(object):
 
     def _get_immediate(self):
         try:
-            return self.immediate.popleft()[1]
+            x = self.immediate.get_nowait()[1]
+            print 'Got %s'%str(x)
+            return x
         except IndexError:
             raise Empty()
 
     def _get(self):
-        if len(self.immediate):
-            immediate_priority = self.immediate[0][0]
-        else:
-            immediate_priority = None
-        
         remaining_times = []
-        buckets = sorted(self.buckets.values(),
-                         key=lambda bucket: bucket.priority and -1 * bucket.priority)
-        for bucket in buckets:
-            # The immediate queue should be exhausted before adding any
-            # tasks of the same or lower priority. This ensures that a 
-            # single bucket cannot hog the queue at the expense of buckets
-            # with the same priority. It can hog the queue at the expense
-            # of lower priority buckets.
-            if (immediate_priority is not None and
-                bucket.priority >= immediate_priority):
-                continue
-
+        for bucket in self.buckets.values():
             remaining = bucket.expected_time()
             if not remaining:
                 try:
                     # Put ready items at the front of the immediate queue.
-                    self.immediate.appendleft((bucket.priority, 
-                                               bucket.get_nowait()))
+                    task = bucket.get_nowait()
+                    print 'Putting (%d, %s)'%(task.priority, task)
+                    self.immediate.put_nowait((task.priority, task))
                 except Empty:
                     pass
                 except RateLimitExceeded:
@@ -166,24 +153,25 @@ class TaskBucket(object):
         return bucket
 
     def update_bucket_for_type(self, task_name):
-        task_type = self.task_registry[task_name]
-        rate_limit = getattr(task_type, "rate_limit", None)
-        rate_limit = timeutils.rate(rate_limit)
-        task_queue = FastQueue()
-        if task_name in self.buckets:
-            task_queue = self._get_queue_for_type(task_name)
+        for p in range(0, 10):
+            name = "%s_%d"%(task_name, p)
+            task_type = self.task_registry[task_name]
+            rate_limit = getattr(task_type, "rate_limit", None)
+            rate_limit = timeutils.rate(rate_limit)
+            task_queue = FastQueue()
+            if task_name in self.buckets:
+                task_queue = self._get_queue_for_type(task_name)
 
-        if rate_limit:
-            task_queue = TokenBucketQueue(rate_limit, queue=task_queue)
+            if rate_limit:
+                task_queue = TokenBucketQueue(rate_limit, queue=task_queue)
 
-        task = self.task_registry[task_name]
-        if hasattr(task, 'priority'):
-            task_queue.priority = task.priority
-        else:
-            task_queue.priority = 0
+            task = self.task_registry[task_name]
+            if hasattr(task, 'priority'):
+                task_queue.priority = task.priority
+            else:
+                task_queue.priority = 0
 
-        self.buckets[task_name] = task_queue
-        return task_queue
+            self.buckets[name] = task_queue
 
     def add_bucket_for_type(self, task_name):
         """Add a bucket for a task type.
@@ -193,7 +181,8 @@ class TaskBucket(object):
         :class:`FastQueue` will be used instead.
 
         """
-        if task_name not in self.buckets:
+        name = "%s_%d"%(task_name, 0)
+        if name not in self.buckets:
             return self.update_bucket_for_type(task_name)
 
     def qsize(self):

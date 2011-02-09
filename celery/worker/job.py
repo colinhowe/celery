@@ -257,7 +257,7 @@ class TaskRequest(object):
     def __init__(self, task_name, task_id, args, kwargs,
             on_ack=noop, retries=0, delivery_info=None, hostname=None,
             email_subject=None, email_body=None, logger=None,
-            eventer=None, eta=None, expires=None, app=None, **opts):
+            eventer=None, eta=None, expires=None, app=None, priority=None, **opts):
         self.app = app_or_default(app)
         self.task_name = task_name
         self.task_id = task_id
@@ -273,6 +273,7 @@ class TaskRequest(object):
         self.eventer = eventer
         self.email_subject = email_subject or self.email_subject
         self.email_body = email_body or self.email_body
+        self.priority = priority
 
         self.task = tasks[self.task_name]
         self._store_errors = True
@@ -295,6 +296,11 @@ class TaskRequest(object):
         if not hasattr(kwargs, "items"):
             raise InvalidTaskError("Task keyword arguments is not a mapping.")
 
+        priority = None
+        if '__priority' in kwargs:
+            priority = kwargs['__priority']
+            del(kwargs['__priority'])
+
         return cls(task_name=body["task"],
                    task_id=body["id"],
                    args=body["args"],
@@ -304,6 +310,7 @@ class TaskRequest(object):
                    expires=maybe_iso8601(body.get("expires")),
                    on_ack=on_ack,
                    delivery_info=delivery_info,
+                   priority=priority,
                    **kw)
 
     def get_instance_attrs(self, loglevel, logfile):
