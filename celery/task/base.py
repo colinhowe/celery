@@ -306,7 +306,7 @@ class BaseTask(object):
                                           routing_key=self.routing_key)
 
     @classmethod
-    def delay(self, priority=None, *args, **kwargs):
+    def delay(self, *args, **kwargs):
         """Star argument version of :meth:`apply_async`.
 
         Does not support the extra options enabled by :meth:`apply_async`.
@@ -317,9 +317,11 @@ class BaseTask(object):
         :returns :class:`celery.result.AsyncResult`:
 
         """
-        if priority is None:
+        if 'priority' not in kwargs or kwargs['priority'] is None:
             return self.apply_async(args, kwargs)
         else:
+            priority = kwargs['priority']
+            del(kwargs['priority'])
             return self.apply_async(args, kwargs, priority=priority)
 
     @classmethod
